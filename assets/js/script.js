@@ -141,6 +141,7 @@ function optimizeVisibleImages() {
         if (img) {
           img.loading = 'eager';
           img.fetchPriority = 'high';
+          img.decoding = 'async';
         }
       });
     }
@@ -148,7 +149,7 @@ function optimizeVisibleImages() {
 
   // === MAIN FILTER & SORT SYSTEM ===
   document.addEventListener("DOMContentLoaded", () => {
-    const resultsCol = qs(".col-lg-9.mt-3") || qs(".col-lg-9");
+    const resultsCol = qs(".course-content-area");
     const container = resultsCol ? qs(".row", resultsCol) : null;
     
     if (!resultsCol || !container) {
@@ -159,9 +160,14 @@ function optimizeVisibleImages() {
     // Get all control elements
     const resetBtn = qs('button[aria-label="Reset all filters"]');
     const applyBtn = qs('button[aria-label="Apply selected filters"]');
-    const sortBtn = qs('button[id^="sortDropdown"]') || qs("#sortDropdown");
-    const sortMenu = sortBtn ? sortBtn.parentElement : null;
-    const sortItems = sortMenu ? qsa(".dropdown-item", sortMenu) : qsa(".dropdown-item");
+    const sortBtn = qs('button[id^="sortDropdown"]', resultsCol) 
+             || qs("#sortDropdown", resultsCol) 
+             || qs('button[id^="sortDropdown"]') 
+             || qs("#sortDropdown");
+    const sortMenu = sortBtn ? sortBtn.closest(".dropdown") : null;
+    const sortItems = sortMenu 
+  ? qsa(".dropdown-item", sortMenu) 
+  : (resultsCol ? qsa(".dropdown-item", resultsCol) : qsa(".dropdown-item"));
     const resultsText = qs("p.my-1", resultsCol);
     const searchInput = qs('input[id^="search-input"]') || qs("#search-input");
     const loadingSpinner = qs('div[id^="loading-spinner"]') || qs("#loading-spinner");
@@ -192,33 +198,35 @@ function optimizeVisibleImages() {
     }
 
 
-    function applySort(courses) {
-      const sortType = (currentSort.type || "").toLowerCase();
-      
-      switch (sortType) {
-        case "title a-z":
-          return courses.sort((a, b) => a.title.localeCompare(b.title));
-        case "title z-a":
-          return courses.sort((a, b) => b.title.localeCompare(a.title));
-        case "price low to high":
-          return courses.sort((a, b) => a.price - b.price);
-        case "price high to low":
-          return courses.sort((a, b) => b.price - a.price);
-        case "popular":
-          return courses.sort((a, b) => b.students - a.students);
-        case "newly published":
-          return courses.sort((a, b) => new Date(b.date) - new Date(a.date));
-        case "average ratings":
-        default:
-          return courses.sort((a, b) => b.rating - a.rating);
-      }
-    }
+function applySort(courses) {
+  const list = [...courses]; // نسخة جديدة
+  const sortType = (currentSort.type || "").toLowerCase();
+
+  switch (sortType) {
+    case "title a-z":
+      return list.sort((a, b) => a.title.localeCompare(b.title));
+    case "title z-a":
+      return list.sort((a, b) => b.title.localeCompare(a.title));
+    case "price low to high":
+      return list.sort((a, b) => a.price - b.price);
+    case "price high to low":
+      return list.sort((a, b) => b.price - a.price);
+    case "popular":
+      return list.sort((a, b) => b.students - a.students);
+    case "newly published":
+      return list.sort((a, b) => new Date(b.date) - new Date(a.date));
+    case "average ratings":
+    default:
+      return list.sort((a, b) => b.rating - a.rating);
+  }
+}
+
 
     // === UI UPDATE FUNCTIONS ===
     function updateSortUI() {
       if (!sortBtn) return;
       const label = sortBtn.querySelector(".sort-label");
-      const match = sortItems.find(it => (it.innerText || "").trim().toLowerCase() === currentSort.type);
+      const match = sortItems.find(it => (it.innerText || "").trim().toLowerCase() === (currentSort.type || "").toLowerCase());
       const text = match ? (match.innerText || "").trim() : defaultSortText;
       
       if (label) label.textContent = text; 
@@ -261,35 +269,114 @@ function optimizeVisibleImages() {
       updateCountsInList(mobileCategoriesRoot);
     }
 
-    function renderPagination(totalItems) {
-      const paginationBar = qs("#pagination-bar");
-      if (!paginationBar) return;
-      
-      paginationBar.innerHTML = "";
-      const totalPages = Math.ceil(totalItems / CONFIG.CARDS_PER_PAGE);
-      if (totalPages <= 1) return;
+function renderPagination(totalItems) {
+  const paginationBar = qs("#pagination-bar");
+  if (!paginationBar) return;
 
-      for (let i = 1; i <= totalPages; i++) {
-        const li = document.createElement("li");
-        li.className = `page-item ${i === currentPage ? "active" : ""}`;
-        const a = document.createElement("a");
-        a.className = "page-link";
-        a.href = "#";
-        a.innerText = String(i);
-        a.addEventListener("click", (e) => {
-          e.preventDefault();
-          if (currentPage === i) return;
-          currentPage = i;
-          processAndRender(false);
-        });
-        li.appendChild(a);
-        paginationBar.appendChild(li);
+  paginationBar.innerHTML = "";
+
+  const perPage = CONFIG.CARDS_PER_PAGE || 6;
+  const totalPages = Math.max(0, Math.ceil(totalItems / perPage));
+
+  // If no pagination needed
+  if (totalPages <= 1) return;
+
+  // Ensure currentPage is valid
+  if (typeof currentPage !== "number" || currentPage < 1) currentPage = 1;
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  const fragment = document.createDocumentFragment();
+
+  const makePageItem = (label, page, opts = {}) => {
+    const li = document.createElement("li");
+    li.className = `page-item${opts.disabled ? " disabled" : ""}${opts.active ? " active" : ""}`;
+
+    const a = document.createElement("a");
+    a.className = "page-link";
+    a.href = "#";
+    a.innerText = String(label);
+    a.setAttribute("role", "button");
+    a.setAttribute("aria-label", opts.ariaLabel || `Go to page ${page}`);
+    if (opts.active) a.setAttribute("aria-current", "page");
+    if (opts.rel) a.rel = opts.rel;
+
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (opts.disabled) return;
+      if (currentPage === page) return;
+      currentPage = page;
+      // Re-render (false = don't reset page inside processAndRender)
+      if (typeof processAndRender === "function") {
+        processAndRender(false);
+      } else {
+        // fallback: try renderCourses if present
+        if (typeof renderCourses === "function") renderCourses();
       }
+      // scroll to top of results (optional UX nicety)
+      const resultsTop = qs(".course-content-area");
+      if (resultsTop) resultsTop.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    li.appendChild(a);
+    return li;
+  };
+
+  // Prev
+  fragment.appendChild(makePageItem("‹", Math.max(1, currentPage - 1), { disabled: currentPage === 1, ariaLabel: "Previous page", rel: "prev" }));
+
+  // Smart page windowing: show first, last, and nearby pages with ellipsis
+  const delta = 2; // how many pages around current to show
+  const range = [];
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || (i >= currentPage - delta && i <= currentPage + delta)) {
+      range.push(i);
     }
+  }
+
+  let last = 0;
+  for (const i of range) {
+    if (i - last > 1) {
+      // insert ellipsis
+      const ell = document.createElement("li");
+      ell.className = "page-item disabled";
+      const span = document.createElement("span");
+      span.className = "page-link";
+      span.innerText = "...";
+      span.setAttribute("aria-hidden", "true");
+      ell.appendChild(span);
+      fragment.appendChild(ell);
+    }
+    fragment.appendChild(makePageItem(i, i, { active: i === currentPage }));
+    last = i;
+  }
+
+  // Next
+  fragment.appendChild(makePageItem("›", Math.min(totalPages, currentPage + 1), { disabled: currentPage === totalPages, ariaLabel: "Next page", rel: "next" }));
+
+  // Append to DOM
+  paginationBar.appendChild(fragment);
+}
+
 
     function toggleSpinner(show) {
-      if (loadingSpinner) loadingSpinner.style.display = show ? "flex" : "none";
-    }
+  if (!loadingSpinner) return false;
+
+  if (show) {
+    loadingSpinner.style.opacity = 0;
+    loadingSpinner.style.display = "flex";
+    requestAnimationFrame(() => {
+      loadingSpinner.style.transition = "opacity 0.3s ease";
+      loadingSpinner.style.opacity = 1;
+    });
+  } else {
+    loadingSpinner.style.transition = "opacity 0.3s ease";
+    loadingSpinner.style.opacity = 0;
+    setTimeout(() => {
+      loadingSpinner.style.display = "none";
+    }, 300); // نفس مدة الـ transition
+  }
+  return show;
+}
 
     function updateURL() {
       const filters = readFilters();
@@ -563,20 +650,21 @@ function optimizeVisibleImages() {
 
   // Quick helpers
   window.quickAddCourse = (title, category, price = 0) => {
-    return CourseManager.addNewCourse({
-      title,
-      category,
-      price,
-      level: "Beginner",
-      students: 0,
-      lessons: 1,
-      rating: 5,
-      description: `Learn about ${title.toLowerCase()}`,
-      image: "assets/img/course-large.jpg",
-      instructor: "New Instructor",
-      tags: [title.toLowerCase().replace(/\s+/g, '-')]
-    });
-  };
+  return CourseManager.addNewCourse({
+    title,
+    category,
+    price,
+    level: "Beginner",
+    students: 0,
+    lessons: 1,
+    rating: 5,
+    description: `Learn about ${title.toLowerCase()}`,
+    image: { card: "assets/img/course-large" }, // <-- كائن مع خاصية card (بدون امتداد)
+    instructor: "New Instructor",
+    tags: [title.toLowerCase().replace(/\s+/g, '-')]
+  });
+};
+
 
   console.log('Complete Course Platform loaded! 🎉');
   console.log('Available functions:');

@@ -1,3 +1,4 @@
+(function () {
 'use strict';
 document.addEventListener("DOMContentLoaded", () => {
   // ==================================
@@ -299,10 +300,12 @@ const addSchemaMarkup = (course, realRatings = null) => {
         <li class="mb-2"><i class="bi bi-person-video icon-gold me-2"></i><strong>Instructor:</strong> ${course.instructor || '—'}</li>
         <li class="mb-2"><i class="bi bi-bar-chart-fill icon-gold me-2"></i><strong>Category:</strong> ${course.category || '—'} | <strong>Level:</strong> ${course.level || '—'}</li>
         <li class="mb-2">
-          <span class="me-3"><i class="bi bi-people-fill icon-gold me-2"></i> ${Number(course.students || 0).toLocaleString()} Students</span>
-          <span class="me-3"><i class="bi bi-book-fill icon-gold me-2"></i> ${course.lessons ?? '0'} Lessons</span>
-          <span><strong>Rating:</strong> <span id="rating-display" class="placeholder-glow"><span class="placeholder col-4"></span></span></span>
-        </li>
+  <div class="d-flex flex-wrap align-items-center">
+    <span class="me-3 mb-1"><i class="bi bi-people-fill icon-gold me-2"></i> ${Number(course.students || 0).toLocaleString()} Students</span>
+    <span class="me-3 mb-1"><i class="bi bi-book-fill icon-gold me-2"></i> ${course.lessons ?? '0'} Lessons</span>
+    <span class="mb-1"><strong>Rating:</strong> <span id="rating-display" class="placeholder-glow"><span class="placeholder col-4"></span></span></span>
+  </div>
+</li>
         <li class="mb-2"><i class="bi bi-patch-check-fill icon-gold me-2"></i><strong>Last Updated:</strong> ${course.date ? new Date(course.date).toLocaleDateString() : '—'}</li>
       `;
     }
@@ -572,6 +575,7 @@ const addSchemaMarkup = (course, realRatings = null) => {
         return;
       }
 
+      // استماع لحدث جاهزية إن وُجد (يوصى أن يطلقه ملف ratings-system.js بعد التعريف)
       const onReady = () => {
         window.removeEventListener('RatingSystemReady', onReady);
         loadRealRatings();
@@ -579,6 +583,7 @@ const addSchemaMarkup = (course, realRatings = null) => {
       };
       window.addEventListener('RatingSystemReady', onReady);
 
+      // polling fallback بدرجة أدنى للحفاظ على الأداء (500ms)
       const poll = setInterval(() => {
         if (typeof RatingSystem !== 'undefined' && RatingSystem.fetchRatings) {
           clearInterval(poll);
@@ -589,7 +594,11 @@ const addSchemaMarkup = (course, realRatings = null) => {
       }, 500);
     };
 
+    // إطلاق انتظار التحميل (واحد فقط)
     waitForRatingSystem();
-  }; 
+  }; // end initializePage
+
+  // تشغيل البداية
   initializePage();
-}); 
+}); // DOMContentLoaded 
+})();

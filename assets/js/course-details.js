@@ -102,74 +102,80 @@ document.addEventListener("DOMContentLoaded", () => {
     setMeta('name', 'twitter:image', ogImage);
   };
 
-  /**
-   * إضافة JSON-LD مُصحح ومُحسّن - يحل أخطاء جوجل ويشمل FAQ
-   * @param {object} course
-   * @param {{average:number,count:number}|null} realRatings
-   */
-  const addSchemaMarkup = (course, realRatings = null) => {
-    if (!course) return;
-    const scriptId = `jsonld-course-${course.id || 'unknown'}`;
-    const existing = document.getElementById(scriptId);
-    if (existing) existing.remove();
 
-    const imgPath = course.image?.details?.replace(/^\/+/, '') || 'assets/img/course-fallback';
-    const imageUrl = `${DOMAIN}/${imgPath}-large.jpg`;
+/**
+ * إضافة JSON-LD 
+ * @param {object} course
+ * @param {{average:number,count:number}|null} realRatings
+ */
+const addSchemaMarkup = (course, realRatings = null) => {
+  if (!course) return;
+  const scriptId = `jsonld-course-${course.id || 'unknown'}`;
+  const existing = document.getElementById(scriptId);
+  if (existing) existing.remove();
 
-    const schema = {
-      "@context": "https://schema.org",
-      "@type": "Course",
-      "name": course.title,
-      "description": course.description,
+  const imgPath = course.image?.details?.replace(/^\/+/, '') || 'assets/img/course-fallback';
+  const imageUrl = `${DOMAIN}/${imgPath}-large.jpg`;
+
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "Course",
+    "name": course.title,
+    "description": course.description,
+    "url": window.location.href,
+    "image": imageUrl,
+    "datePublished": course.date || undefined,
+    "educationalLevel": course.level || undefined,
+    "instructor": course.instructor ? { "@type": "Person", "name": course.instructor } : undefined,
+    "provider": {
+      "@type": "Organization",
+      "name": BRAND_NAME,
+      "sameAs": DOMAIN
+    },
+    "offers": {
+      "@type": "Offer",
       "url": window.location.href,
-      "image": imageUrl,
-      "datePublished": course.date || undefined,
-      "educationalLevel": course.level || undefined,
-      "courseWorkload": (course.lessons) ? `PT${Number(course.lessons)}H` : undefined, // تم التأكد من مكانه الصحيح
-      "instructor": course.instructor ? { "@type": "Person", "name": course.instructor } : undefined,
-      "provider": {
-        "@type": "Organization",
-        "name": BRAND_NAME,
-        "sameAs": DOMAIN
-      },
-      "offers": {
-        "@type": "Offer",
-        "url": window.location.href,
-        "price": (typeof course.price === 'number' ? course.price.toFixed(2) : undefined),
-        "priceCurrency": (typeof course.price === 'number' ? "USD" : undefined),
-        "availability": "https://schema.org/OnlineOnly",
-        "category": course.category || undefined //  ✅  **الإصلاح الأول: إضافة فئة العرض**
-      },
-      // --- تم إزالة hasCourseInstance لتجنب التعارض (الإصلاح الثاني) ---
-      "mainEntity": (Array.isArray(course.faq) && course.faq.length > 0) ? {
-        "@type": "FAQPage",
-        "mainEntity": course.faq.map(item => ({
-          "@type": "Question",
-          "name": item.question,
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": item.answer
-          }
-        }))
-      } : undefined
-    };
+      "price": (typeof course.price === 'number' ? course.price.toFixed(2) : undefined),
+      "priceCurrency": (typeof course.price === 'number' ? "USD" : undefined),
+      "availability": "https://schema.org/OnlineOnly",
+      "category": course.category || undefined
+    },
 
-    if (realRatings && Number(realRatings.count) > 0 && Number(realRatings.average) >= 0) {
-      schema.aggregateRating = {
-        "@type": "AggregateRating",
-        "ratingValue": Number(Number(realRatings.average).toFixed(2)),
-        "bestRating": 5,
-        "ratingCount": Number(realRatings.count)
-      };
-    }
-
-    const cleanSchema = JSON.parse(JSON.stringify(schema));
-    const script = document.createElement('script');
-    script.type = 'application/ld+json';
-    script.id = scriptId;
-    script.textContent = JSON.stringify(cleanSchema, null, 2);
-    document.head.appendChild(script);
+  "hasCourseInstance": {
+      "@type": "CourseInstance",
+      "courseMode": "online",
+      "courseWorkload": (course.lessons) ? `PT${Number(course.lessons)}H` : undefined
+    },
+    "mainEntity": (Array.isArray(course.faq) && course.faq.length > 0) ? {
+      "@type": "FAQPage",
+      "mainEntity": course.faq.map(item => ({
+        "@type": "Question",
+        "name": item.question,
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": item.answer
+        }
+      }))
+    } : undefined
   };
+
+  if (realRatings && Number(realRatings.count) > 0 && Number(realRatings.average) >= 0) {
+    schema.aggregateRating = {
+      "@type": "AggregateRating",
+      "ratingValue": Number(Number(realRatings.average).toFixed(2)),
+      "bestRating": 5,
+      "ratingCount": Number(realRatings.count)
+    };
+  }
+
+  const cleanSchema = JSON.parse(JSON.stringify(schema));
+  const script = document.createElement('script');
+  script.type = 'application/ld+json';
+  script.id = scriptId;
+  script.textContent = JSON.stringify(cleanSchema, null, 2);
+  document.head.appendChild(script);
+};
+
 
   /**
    * إضافة سكيما BreadcrumbList ديناميكياً
@@ -566,7 +572,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // استماع لحدث جاهزية إن وُجد (يوصى أن يطلقه ملف ratings-system.js بعد التعريف)
       const onReady = () => {
         window.removeEventListener('RatingSystemReady', onReady);
         loadRealRatings();
@@ -574,7 +579,6 @@ document.addEventListener("DOMContentLoaded", () => {
       };
       window.addEventListener('RatingSystemReady', onReady);
 
-      // polling fallback بدرجة أدنى للحفاظ على الأداء (500ms)
       const poll = setInterval(() => {
         if (typeof RatingSystem !== 'undefined' && RatingSystem.fetchRatings) {
           clearInterval(poll);
@@ -585,10 +589,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 500);
     };
 
-    // إطلاق انتظار التحميل (واحد فقط)
     waitForRatingSystem();
-  }; // end initializePage
-
-  // تشغيل البداية
+  }; 
   initializePage();
-}); // DOMContentLoaded 
+}); 

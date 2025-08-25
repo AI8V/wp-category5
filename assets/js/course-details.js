@@ -53,7 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const r = Math.max(0, Math.min(5, Math.round(Number(rating) || 0)));
     let stars = "";
     for (let i = 1; i <= 5; i++) {
-      stars += `<i class="bi ${i <= r ? "bi-star-fill text-warning" : "bi-star text-muted"}" aria-hidden="true"></i>`;
+      stars += `<span class="bi ${i <= r ? "bi-star-fill text-warning" : "bi-star text-muted"}" aria-hidden="true"></span>`;
     }
     return stars;
   };
@@ -297,16 +297,16 @@ const addSchemaMarkup = (course, realRatings = null) => {
     }
     if (metaCardContainer) {
       metaCardContainer.innerHTML = `
-        <li class="mb-2"><i class="bi bi-person-video icon-gold me-2"></i><strong>Instructor:</strong> ${course.instructor || '—'}</li>
-        <li class="mb-2"><i class="bi bi-bar-chart-fill icon-gold me-2"></i><strong>Category:</strong> ${course.category || '—'} | <strong>Level:</strong> ${course.level || '—'}</li>
+        <span class="mb-2"><span class="bi bi-person-video icon-gold me-2" aria-hidden="true"></span><strong>Instructor:</strong> ${course.instructor || '—'}</li>
+        <li class="mb-2"><span class="bi bi-bar-chart-fill icon-gold me-2" aria-hidden="true"></span><strong>Category:</strong> ${course.category || '—'} | <strong>Level:</strong> ${course.level || '—'}</li>
         <li class="mb-2">
   <div class="d-flex flex-wrap align-items-center">
-    <span class="me-3 mb-1"><i class="bi bi-people-fill icon-gold me-2"></i> ${Number(course.students || 0).toLocaleString()} Students</span>
-    <span class="me-3 mb-1"><i class="bi bi-book-fill icon-gold me-2"></i> ${course.lessons ?? '0'} Lessons</span>
+    <span class="me-3 mb-1"><span class="bi bi-people-fill icon-gold me-2" aria-hidden="true"></span> ${Number(course.students || 0).toLocaleString()} Students</span>
+    <span class="me-3 mb-1"><span class="bi bi-book-fill icon-gold me-2" aria-hidden="true"></span> ${course.lessons ?? '0'} Lessons</span>
     <span class="mb-1"><strong>Rating:</strong> <span id="rating-display" class="placeholder-glow"><span class="placeholder col-4"></span></span></span>
   </div>
 </li>
-        <li class="mb-2"><i class="bi bi-patch-check-fill icon-gold me-2"></i><strong>Last Updated:</strong> ${course.date ? new Date(course.date).toLocaleDateString() : '—'}</li>
+        <li class="mb-2"><span class="bi bi-patch-check-fill icon-gold me-2" aria-hidden="true"></span><strong>Last Updated:</strong> ${course.date ? new Date(course.date).toLocaleDateString() : '—'}</li>
       `;
     }
 
@@ -315,7 +315,7 @@ const addSchemaMarkup = (course, realRatings = null) => {
     if (loList) {
       if (Array.isArray(course.learningObjectives) && course.learningObjectives.length > 0) {
         loList.innerHTML = course.learningObjectives.map(item =>
-          `<li class="col-md-6 mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i><span>${item}</span></li>`
+          `<li class="col-md-6 mb-2"><span class="bi bi-check-circle-fill text-success me-2" aria-hidden="true"></span><span>${item}</span></li>`
         ).join('');
       } else {
         loList.closest('section')?.style.setProperty('display', 'none');
@@ -332,7 +332,7 @@ const addSchemaMarkup = (course, realRatings = null) => {
               <button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#section-${index}">${section.title}</button>
             </h3>
             <div id="section-${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#curriculum-accordion">
-              <div class="accordion-body"><ul class="list-group list-group-flush">${Array.isArray(section.lessons) ? section.lessons.map(lesson => `<li class="list-group-item"><i class="bi bi-play-circle-fill me-2"></i>${lesson}</li>`).join('') : ''}</ul></div>
+              <div class="accordion-body"><ul class="list-group list-group-flush">${Array.isArray(section.lessons) ? section.lessons.map(lesson => `<li class="list-group-item"><span class="bi bi-play-circle-fill me-2" aria-hidden="true"></span>${lesson}</li>`).join('') : ''}</ul></div>
             </div>
           </div>`).join('');
       } else {
@@ -446,8 +446,8 @@ const addSchemaMarkup = (course, realRatings = null) => {
         <p class="text-light mb-1"><strong>Instructor:</strong> ${course.instructor || '—'}</p>
         <p class="text-light mb-1"><strong>Category:</strong> ${course.category || '—'} | <strong>Level:</strong> ${course.level || '—'}</p>
         <p class="text-light mb-1">
-          <span class="me-3"><i class="bi bi-people-fill icon-gold me-2"></i> ${studentsText} Students</span>
-          <span class="me-3"><i class="bi bi-book-fill icon-gold me-2"></i> ${lessonsText} Lessons</span>
+          <span class="me-3"><span class="bi bi-people-fill icon-gold me-2" aria-hidden="true"></span> ${studentsText} Students</span>
+          <span class="me-3"><span class="bi bi-book-fill icon-gold me-2" aria-hidden="true"></span> ${lessonsText} Lessons</span>
           <span><strong>Rating:</strong> <span id="rating-display" class="placeholder-glow"><span class="placeholder col-4"></span></span></span>
         </p>
         <p class="fs-4 fw-bold text-light mb-2">Price: ${priceDisplay}</p>

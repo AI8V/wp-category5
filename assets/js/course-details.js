@@ -297,15 +297,15 @@ const addSchemaMarkup = (course, realRatings = null) => {
     }
     if (metaCardContainer) {
       metaCardContainer.innerHTML = `
-        <span class="mb-2"><span class="bi bi-person-video icon-gold me-2" aria-hidden="true"></span><strong>Instructor:</strong> ${course.instructor || '—'}</li>
+        <li class="mb-2"><span class="bi bi-person-video icon-gold me-2" aria-hidden="true"></span><strong>Instructor:</strong> ${course.instructor || '—'}</li>
         <li class="mb-2"><span class="bi bi-bar-chart-fill icon-gold me-2" aria-hidden="true"></span><strong>Category:</strong> ${course.category || '—'} | <strong>Level:</strong> ${course.level || '—'}</li>
         <li class="mb-2">
-  <div class="d-flex flex-wrap align-items-center">
-    <span class="me-3 mb-1"><span class="bi bi-people-fill icon-gold me-2" aria-hidden="true"></span> ${Number(course.students || 0).toLocaleString()} Students</span>
-    <span class="me-3 mb-1"><span class="bi bi-book-fill icon-gold me-2" aria-hidden="true"></span> ${course.lessons ?? '0'} Lessons</span>
-    <span class="mb-1"><strong>Rating:</strong> <span id="rating-display" class="placeholder-glow"><span class="placeholder col-4"></span></span></span>
-  </div>
-</li>
+          <div class="d-flex flex-wrap align-items-center">
+            <span class="me-3 mb-1"><span class="bi bi-people-fill icon-gold me-2" aria-hidden="true"></span> ${Number(course.students || 0).toLocaleString()} Students</span>
+            <span class="me-3 mb-1"><span class="bi bi-book-fill icon-gold me-2" aria-hidden="true"></span> ${course.lessons ?? '0'} Lessons</span>
+            <span class="mb-1"><strong>Rating:</strong> <span id="rating-display" class="placeholder-glow"><span class="placeholder col-4"></span></span></span>
+          </div>
+        </li>
         <li class="mb-2"><span class="bi bi-patch-check-fill icon-gold me-2" aria-hidden="true"></span><strong>Last Updated:</strong> ${course.date ? new Date(course.date).toLocaleDateString() : '—'}</li>
       `;
     }

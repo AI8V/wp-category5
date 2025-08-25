@@ -232,9 +232,24 @@ document.addEventListener("DOMContentLoaded", () => {
     if (imageCardContainer) {
       imageCardContainer.innerHTML = imageBase
         ? `<picture>
-            <source srcset="${imageBase}-large.webp" type="image/webp">
-            <img src="${imageBase}-large.jpg" class="card-img-top" alt="${course.title}" loading="eager" fetchpriority="high" decoding="async" onerror="this.onerror=null; this.src='${fallbackImage}';">
-          </picture>`
+    <source 
+        srcset="${imageBase}-small.webp 800w, ${imageBase}-large.webp 1200w" 
+        sizes="(min-width: 1200px) 750px, (min-width: 992px) 630px, 90vw"
+        type="image/webp">
+    <source 
+        srcset="${imageBase}-small.jpg 800w, ${imageBase}-large.jpg 1200w"
+        sizes="(min-width: 1200px) 750px, (min-width: 992px) 630px, 90vw"
+        type="image/jpeg">
+    <img 
+        src="${imageBase}-large.jpg" 
+        alt="${course.title}" 
+        class="img-fluid rounded shadow" 
+        width="600" height="400"
+        onerror="this.onerror=null; this.src='${fallbackImage}';"
+        loading="eager" 
+        fetchpriority="high" 
+        decoding="async">
+</picture>`
         : `<img src="${fallbackImage}" class="card-img-top" alt="${course.title}">`;
     }
     if (priceCardContainer) {
@@ -356,16 +371,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const imageBase = imageDetails ? `../../${imageDetails}` : null;
     if (imageContainer) {
       if (imageBase) {
-        imageContainer.innerHTML = `
-          <picture>
-            <source srcset="${imageBase}-small.webp 800w, ${imageBase}-large.webp 1200w" sizes="(max-width: 991px) 95vw, 50vw" type="image/webp">
-            <source srcset="${imageBase}-small.jpg 800w, ${imageBase}-large.jpg 1200w" sizes="(max-width: 991px) 95vw, 50vw" type="image/jpeg">
-            <img src="${imageBase}-large.jpg" alt="${course.title}" class="img-fluid rounded shadow" 
-                 width="600" height="400"
-                 onerror="this.onerror=null; this.src='${fallbackImage}';"
-                 loading="eager" fetchpriority="high" decoding="async">
-          </picture>
-        `;
+        imageContainer.innerHTML = `<picture>
+    <source 
+        srcset="${imageBase}-small.webp" 
+        sizes="(min-width: 992px) 350px, 90vw"
+        type="image/webp">
+    <source 
+        srcset="${imageBase}-small.jpg"
+        sizes="(min-width: 992px) 350px, 90vw"
+        type="image/jpeg">
+    <img src="${imageBase}-small.jpg" class="card-img-top" alt="${course.title}" 
+         loading="eager" fetchpriority="high" decoding="async"
+         onerror="this.onerror=null; this.src='${fallbackImage}';">
+</picture>`;
       } else {
         imageContainer.innerHTML = `<img src="${fallbackImage}" alt="${course.title}" class="img-fluid rounded shadow">`;
       }
@@ -542,4 +560,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // تشغيل البداية
   initializePage();
-}); // DOMContentLoaded
+}); // DOMContentLoaded 

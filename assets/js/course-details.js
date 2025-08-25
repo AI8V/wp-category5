@@ -103,7 +103,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   /**
-   * إضافة JSON-LD مُحسّن ويشمل المنهج وFAQ — يدعم aggregateRating اختياريًا
+   * إضافة JSON-LD مُصحح ومُحسّن - يحل أخطاء جوجل ويشمل FAQ
    * @param {object} course
    * @param {{average:number,count:number}|null} realRatings
    */
@@ -113,7 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const existing = document.getElementById(scriptId);
     if (existing) existing.remove();
 
-    const imgPath = course.image && course.image.details ? course.image.details.replace(/^\/+/, '') : 'assets/img/course-fallback';
+    const imgPath = course.image?.details?.replace(/^\/+/, '') || 'assets/img/course-fallback';
     const imageUrl = `${DOMAIN}/${imgPath}-large.jpg`;
 
     const schema = {
@@ -125,6 +125,7 @@ document.addEventListener("DOMContentLoaded", () => {
       "image": imageUrl,
       "datePublished": course.date || undefined,
       "educationalLevel": course.level || undefined,
+      "courseWorkload": (course.lessons) ? `PT${Number(course.lessons)}H` : undefined, // تم التأكد من مكانه الصحيح
       "instructor": course.instructor ? { "@type": "Person", "name": course.instructor } : undefined,
       "provider": {
         "@type": "Organization",
@@ -136,19 +137,10 @@ document.addEventListener("DOMContentLoaded", () => {
         "url": window.location.href,
         "price": (typeof course.price === 'number' ? course.price.toFixed(2) : undefined),
         "priceCurrency": (typeof course.price === 'number' ? "USD" : undefined),
-        "availability": "https://schema.org/OnlineOnly"
+        "availability": "https://schema.org/OnlineOnly",
+        "category": course.category || undefined //  ✅  **الإصلاح الأول: إضافة فئة العرض**
       },
-      // --- التحسينات الجديدة ---
-      "hasCourseInstance": {
-        "@type": "CourseInstance",
-        "courseMode": "online"
-      },
-      "learningResourceType": "Course",
-      "coursePrerequisites": undefined,
-      "teaches": (Array.isArray(course.learningObjectives) && course.learningObjectives.length > 0)
-        ? course.learningObjectives.map(item => ({ "@type": "EducationalOccupationalCredential", "name": item }))
-        : undefined,
-      "courseWorkload": (course.lessons) ? `PT${Number(course.lessons)}H` : undefined,
+      // --- تم إزالة hasCourseInstance لتجنب التعارض (الإصلاح الثاني) ---
       "mainEntity": (Array.isArray(course.faq) && course.faq.length > 0) ? {
         "@type": "FAQPage",
         "mainEntity": course.faq.map(item => ({
@@ -160,10 +152,8 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }))
       } : undefined
-      // --- نهاية التحسينات ---
     };
 
-    // aggregateRating (اختياري) إذا توفرت تقييمات حقيقية
     if (realRatings && Number(realRatings.count) > 0 && Number(realRatings.average) >= 0) {
       schema.aggregateRating = {
         "@type": "AggregateRating",
@@ -173,13 +163,56 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
-    // نزيل الحقول undefined عن طريق stringify/parse
     const cleanSchema = JSON.parse(JSON.stringify(schema));
-
     const script = document.createElement('script');
     script.type = 'application/ld+json';
     script.id = scriptId;
     script.textContent = JSON.stringify(cleanSchema, null, 2);
+    document.head.appendChild(script);
+  };
+
+  /**
+   * إضافة سكيما BreadcrumbList ديناميكياً
+   * @param {object} course
+   */
+  const addBreadcrumbSchema = (course) => {
+    if (!course) return;
+    const scriptId = 'jsonld-breadcrumb';
+    const existing = document.getElementById(scriptId);
+    if (existing) existing.remove(); // أزل القديم إن وجد
+
+    const homeUrl = new URL('../../index.html', window.location.href).href;
+    const coursesUrl = new URL('../index.html', window.location.href).href;
+
+    const schema = {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": homeUrl
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Courses",
+          "item": coursesUrl
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": course.title,
+          "item": window.location.href // الرابط الحالي
+        }
+      ]
+    };
+
+    const script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.id = scriptId;
+    script.textContent = JSON.stringify(schema, null, 2);
     document.head.appendChild(script);
   };
 
@@ -354,6 +387,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- Render static parts immediately ---
     renderHeader(course);
     updateMetaTags(course);
+    addBreadcrumbSchema(course); //  ✅  **استدعاء وظيفة Breadcrumb الجديدة**
 
     // --- unified hydration (التوجيه الأول) ---
     hydratePageContent(course);
@@ -371,19 +405,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const imageBase = imageDetails ? `../../${imageDetails}` : null;
     if (imageContainer) {
       if (imageBase) {
-        imageContainer.innerHTML = `<picture>
-    <source 
-        srcset="${imageBase}-small.webp" 
-        sizes="(min-width: 992px) 350px, 90vw"
-        type="image/webp">
-    <source 
-        srcset="${imageBase}-small.jpg"
-        sizes="(min-width: 992px) 350px, 90vw"
-        type="image/jpeg">
-    <img src="${imageBase}-small.jpg" class="card-img-top" alt="${course.title}" 
-         loading="eager" fetchpriority="high" decoding="async"
-         onerror="this.onerror=null; this.src='${fallbackImage}';">
-</picture>`;
+        imageContainer.innerHTML = `
+          <picture>
+            <source srcset="${imageBase}-small.webp 800w, ${imageBase}-large.webp 1200w" sizes="(max-width: 991px) 95vw, 50vw" type="image/webp">
+            <source srcset="${imageBase}-small.jpg 800w, ${imageBase}-large.jpg 1200w" sizes="(max-width: 991px) 95vw, 50vw" type="image/jpeg">
+            <img src="${imageBase}-large.jpg" alt="${course.title}" class="img-fluid rounded shadow" 
+                 width="600" height="400"
+                 onerror="this.onerror=null; this.src='${fallbackImage}';"
+                 loading="eager" fetchpriority="high" decoding="async">
+          </picture>
+        `;
       } else {
         imageContainer.innerHTML = `<img src="${fallbackImage}" alt="${course.title}" class="img-fluid rounded shadow">`;
       }

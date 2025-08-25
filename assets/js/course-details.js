@@ -103,8 +103,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   /**
-   * إضافة JSON-LD مُنظف وصالح - يستخدم ID فريد لكل كورس حتى لا يلمس سكريبتات أخرى
-   * يضيف aggregateRating فقط إذا توفرت بيانات حقيقية
+   * إضافة JSON-LD مُحسّن ويشمل المنهج وFAQ — يدعم aggregateRating اختياريًا
    * @param {object} course
    * @param {{average:number,count:number}|null} realRatings
    */
@@ -135,12 +134,36 @@ document.addEventListener("DOMContentLoaded", () => {
       "offers": {
         "@type": "Offer",
         "url": window.location.href,
-        "price": (typeof course.price === 'number' ? course.price : undefined),
+        "price": (typeof course.price === 'number' ? course.price.toFixed(2) : undefined),
         "priceCurrency": (typeof course.price === 'number' ? "USD" : undefined),
         "availability": "https://schema.org/OnlineOnly"
-      }
+      },
+      // --- التحسينات الجديدة ---
+      "hasCourseInstance": {
+        "@type": "CourseInstance",
+        "courseMode": "online"
+      },
+      "learningResourceType": "Course",
+      "coursePrerequisites": undefined,
+      "teaches": (Array.isArray(course.learningObjectives) && course.learningObjectives.length > 0)
+        ? course.learningObjectives.map(item => ({ "@type": "EducationalOccupationalCredential", "name": item }))
+        : undefined,
+      "courseWorkload": (course.lessons) ? `PT${Number(course.lessons)}H` : undefined,
+      "mainEntity": (Array.isArray(course.faq) && course.faq.length > 0) ? {
+        "@type": "FAQPage",
+        "mainEntity": course.faq.map(item => ({
+          "@type": "Question",
+          "name": item.question,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": item.answer
+          }
+        }))
+      } : undefined
+      // --- نهاية التحسينات ---
     };
 
+    // aggregateRating (اختياري) إذا توفرت تقييمات حقيقية
     if (realRatings && Number(realRatings.count) > 0 && Number(realRatings.average) >= 0) {
       schema.aggregateRating = {
         "@type": "AggregateRating",
@@ -150,7 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
-    // نزيل الحقول undefined
+    // نزيل الحقول undefined عن طريق stringify/parse
     const cleanSchema = JSON.parse(JSON.stringify(schema));
 
     const script = document.createElement('script');
@@ -194,115 +217,88 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   /**
-   * ترطيب "بطاقة المعلومات" الجانبية
+   * يرطب كل محتوى الصفحة الديناميكي بناءً على بيانات الكورس
+   * @param {object} course 
    */
-  function hydrateInfoCard(course) {
-    if (!course) return;
-    const imageContainer = document.getElementById('course-card-image');
-    const priceContainer = document.getElementById('course-card-price');
-    const metaContainer = document.getElementById('course-card-meta');
-
-    // صورة الكورس مع fallback آمن
+  function hydratePageContent(course) {
+    // 1. بطاقة المعلومات الجانبية (Sidebar Card)
+    const imageCardContainer = document.getElementById('course-card-image');
+    const priceCardContainer = document.getElementById('course-card-price');
+    const metaCardContainer = document.getElementById('course-card-meta');
     const fallbackImage = '../../assets/img/course-fallback.jpg';
-    const imageDetails = course.image && course.image.details ? course.image.details.replace(/^\/+/, '') : null;
+    const imageDetails = course.image?.details?.replace(/^\/+/, '');
     const imageBase = imageDetails ? `../../${imageDetails}` : null;
-
-    if (imageContainer) {
-      if (imageBase) {
-        imageContainer.innerHTML = `
-          <picture>
+    
+    if (imageCardContainer) {
+      imageCardContainer.innerHTML = imageBase
+        ? `<picture>
             <source srcset="${imageBase}-large.webp" type="image/webp">
-            <img src="${imageBase}-large.jpg" class="card-img-top" alt="${course.title}" 
-                 loading="eager" fetchpriority="high" decoding="async"
-                 onerror="this.onerror=null; this.src='${fallbackImage}';">
-          </picture>`;
-      } else {
-        imageContainer.innerHTML = `<img src="${fallbackImage}" class="card-img-top" alt="${course.title}">`;
-      }
+            <img src="${imageBase}-large.jpg" class="card-img-top" alt="${course.title}" loading="eager" fetchpriority="high" decoding="async" onerror="this.onerror=null; this.src='${fallbackImage}';">
+          </picture>`
+        : `<img src="${fallbackImage}" class="card-img-top" alt="${course.title}">`;
     }
-
-    if (priceContainer) {
-      priceContainer.innerHTML = course.price === 0 ? 'Free' : `$${(Number(course.price) || 0).toFixed(2)}`;
+    if (priceCardContainer) {
+      priceCardContainer.textContent = course.price === 0 ? 'Free' : `$${(Number(course.price) || 0).toFixed(2)}`;
     }
-
-    // metaContainer: نعرض الطلاب، الدروس، ونضع التقييم في نفس السطر لكي يظهر مع الأرقام
-    if (metaContainer) {
-      const studentsText = course.students ? Number(course.students).toLocaleString() : '0';
-      const lessonsText = course.lessons !== undefined ? course.lessons : '0';
-      metaContainer.innerHTML = `
+    if (metaCardContainer) {
+      metaCardContainer.innerHTML = `
         <li class="mb-2"><i class="bi bi-person-video icon-gold me-2"></i><strong>Instructor:</strong> ${course.instructor || '—'}</li>
         <li class="mb-2"><i class="bi bi-bar-chart-fill icon-gold me-2"></i><strong>Category:</strong> ${course.category || '—'} | <strong>Level:</strong> ${course.level || '—'}</li>
         <li class="mb-2">
-          <span class="me-3"><i class="bi bi-people-fill icon-gold me-2"></i> ${studentsText} Students</span>
-          <span class="me-3"><i class="bi bi-book-fill icon-gold me-2"></i> ${lessonsText} Lessons</span>
+          <span class="me-3"><i class="bi bi-people-fill icon-gold me-2"></i> ${Number(course.students || 0).toLocaleString()} Students</span>
+          <span class="me-3"><i class="bi bi-book-fill icon-gold me-2"></i> ${course.lessons ?? '0'} Lessons</span>
           <span><strong>Rating:</strong> <span id="rating-display" class="placeholder-glow"><span class="placeholder col-4"></span></span></span>
         </li>
         <li class="mb-2"><i class="bi bi-patch-check-fill icon-gold me-2"></i><strong>Last Updated:</strong> ${course.date ? new Date(course.date).toLocaleDateString() : '—'}</li>
       `;
     }
-  }
 
-  /**
-   * ترطيب قسم "ماذا ستتعلم"
-   */
-  function hydrateLearningObjectives(course) {
-    const list = document.getElementById('what-youll-learn-list');
-    if (list && course && Array.isArray(course.learningObjectives) && course.learningObjectives.length > 0) {
-      list.innerHTML = course.learningObjectives.map(item =>
-        `<li class="col-md-6 mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i><span>${item}</span></li>`
-      ).join('');
-    } else if (list) {
-      list.closest('section')?.style.setProperty('display', 'none');
+    // 2. ماذا ستتعلم (Learning Objectives)
+    const loList = document.getElementById('what-youll-learn-list');
+    if (loList) {
+      if (Array.isArray(course.learningObjectives) && course.learningObjectives.length > 0) {
+        loList.innerHTML = course.learningObjectives.map(item =>
+          `<li class="col-md-6 mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i><span>${item}</span></li>`
+        ).join('');
+      } else {
+        loList.closest('section')?.style.setProperty('display', 'none');
+      }
     }
-  }
 
-  /**
-   * ترطيب قسم "المنهج"
-   */
-  function hydrateCurriculum(course) {
-    const accordion = document.getElementById('curriculum-accordion');
-    if (accordion && course && Array.isArray(course.curriculum) && course.curriculum.length > 0) {
-      accordion.innerHTML = course.curriculum.map((section, index) => `
-        <div class="accordion-item">
-          <h3 class="accordion-header">
-            <button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#section-${index}">
-              ${section.title}
-            </button>
-          </h3>
-          <div id="section-${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#curriculum-accordion">
-            <div class="accordion-body">
-              <ul class="list-group list-group-flush">
-                ${Array.isArray(section.lessons) ? section.lessons.map(lesson => `<li class="list-group-item"><i class="bi bi-play-circle-fill me-2"></i>${lesson}</li>`).join('') : ''}
-              </ul>
+    // 3. المنهج (Curriculum)
+    const curriculumAccordion = document.getElementById('curriculum-accordion');
+    if (curriculumAccordion) {
+      if (Array.isArray(course.curriculum) && course.curriculum.length > 0) {
+        curriculumAccordion.innerHTML = course.curriculum.map((section, index) => `
+          <div class="accordion-item">
+            <h3 class="accordion-header">
+              <button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#section-${index}">${section.title}</button>
+            </h3>
+            <div id="section-${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#curriculum-accordion">
+              <div class="accordion-body"><ul class="list-group list-group-flush">${Array.isArray(section.lessons) ? section.lessons.map(lesson => `<li class="list-group-item"><i class="bi bi-play-circle-fill me-2"></i>${lesson}</li>`).join('') : ''}</ul></div>
             </div>
-          </div>
-        </div>
-      `).join('');
-    } else if (accordion) {
-      accordion.closest('section')?.style.setProperty('display', 'none');
+          </div>`).join('');
+      } else {
+        curriculumAccordion.closest('section')?.style.setProperty('display', 'none');
+      }
     }
-  }
 
-  /**
-   * ترطيب قسم "الأسئلة الشائعة"
-   */
-  function hydrateFaq(course) {
-    const accordion = document.getElementById('faq-accordion');
-    if (accordion && course && Array.isArray(course.faq) && course.faq.length > 0) {
-      accordion.innerHTML = course.faq.map((item, index) => `
-        <div class="accordion-item">
-          <h3 class="accordion-header">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-${index}">
-              ${item.question}
-            </button>
-          </h3>
-          <div id="faq-${index}" class="accordion-collapse collapse" data-bs-parent="#faq-accordion">
-            <div class="accordion-body">${item.answer}</div>
-          </div>
-        </div>
-      `).join('');
-    } else if (accordion) {
-      accordion.closest('section')?.style.setProperty('display', 'none');
+    // 4. الأسئلة الشائعة (FAQ)
+    const faqAccordion = document.getElementById('faq-accordion');
+    if (faqAccordion) {
+      if (Array.isArray(course.faq) && course.faq.length > 0) {
+        faqAccordion.innerHTML = course.faq.map((item, index) => `
+          <div class="accordion-item">
+            <h3 class="accordion-header">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-${index}">${item.question}</button>
+            </h3>
+            <div id="faq-${index}" class="accordion-collapse collapse" data-bs-parent="#faq-accordion">
+              <div class="accordion-body">${item.answer}</div>
+            </div>
+          </div>`).join('');
+      } else {
+        faqAccordion.closest('section')?.style.setProperty('display', 'none');
+      }
     }
   }
 
@@ -344,15 +340,12 @@ document.addEventListener("DOMContentLoaded", () => {
     renderHeader(course);
     updateMetaTags(course);
 
-    // Hydrate different sections (these functions handle missing DOM gracefully)
-    hydrateInfoCard(course);
-    hydrateLearningObjectives(course);
-    hydrateCurriculum(course);
-    hydrateFaq(course);
+    // --- unified hydration (التوجيه الأول) ---
+    hydratePageContent(course);
 
     // لا نضيف JSON-LD الآن - سنضيفه بعد الحصول على تقييمات حقيقية إن وُجدت
 
-    // --- Populate Skeleton / Primary content slots ---
+    // --- Populate Skeleton / Primary content slots (image, description, meta) ---
     const imageContainer = document.getElementById('course-image-container');
     const descriptionPlaceholder = document.getElementById('course-description-placeholder');
     const metaInfoContainer = document.getElementById('course-meta-info');
@@ -437,7 +430,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
 
-        // إضافة السكيما فقط إذا كانت هناك تقييمات حقيقية
+        // إضافة السكيما (مع aggregateRating إن وُجد)
         addSchemaMarkup(course, (dynamicRatings && Number(dynamicRatings.count) > 0) ? dynamicRatings : null);
 
       } catch (error) {
